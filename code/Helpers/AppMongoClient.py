@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 from pymongo import *
 from Models.models import User, UserDTO, UserDrink
 
@@ -51,11 +52,8 @@ class AppMongoClient:
         users = self.getCollection()
         return users.find_one({"uid": id})
 
-    def getCurrentPatrons(self)->list:
+    def getCurrentPatrons(self):
         users = self.getCollection(id="UserDrink")
-        # lst = list
-        # for u in :
-        #     lst.append(u)
-        d = list(users.find())
+        d = users.find()
         return d
 

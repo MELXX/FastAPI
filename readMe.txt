@@ -1,6 +1,11 @@
 
-run "docker build -t myBackend ." from ./BE docker build -t myBackend .
+run "docker build -t mybackend ." from ./BE
 
-docker run -d --name myBackendContainer -p 80:80 myBackend
+docker run --network=mybridgenetwork -d --name myBackendContainer -p 8000:8000 mybackend
 
-create a venv 
+to run locally:
+cd code
+uvicorn main:app --reload
+
+for docs
+<app root>/docs e,g, http://127.0.0.1:8000/docs

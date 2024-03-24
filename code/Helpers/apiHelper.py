@@ -20,14 +20,15 @@ class apiHelper:
             "name" : drink['strDrink'],
             "ingredient1": drink['strIngredient1']} 
             for drink in data['drinks']]
-        
-        # for i in parsed:
-        #     print(i)
         return parsed
 
     def getAllAlcoholicDrinks(self):
         req = httpx.get("www.thecocktaildb.com/api/json/v1/1/filter.php?a=Alcoholic")
-        data = req.json()
+        return req.json()
     
-print(apiHelper().get_drinks(name="beer"))
+    def get_drinkById(self,id: str):
+        req = httpx.get("https://www.thecocktaildb.com/api/json/v1/1/lookup.php?i=%s"%(id))
+        return req.json()
+    
+print(apiHelper().get_drinkById('11007')['drinks'][0]['strDrink'])
 
