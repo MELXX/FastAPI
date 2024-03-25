@@ -3,11 +3,12 @@ from bson import ObjectId
 from fastapi import FastAPI, HTTPException, status
 from Helpers.AppMongoClient import AppMongoClient
 from Helpers.apiHelper import apiHelper
+from Helpers.dataHelper import *
 from Models.models import *
 from fastapi.middleware.cors import CORSMiddleware
 
 
-from Helpers.dataHelper import jsonConvert,calculateAlcoholSaturation, process_drinks_json,strCleaner
+from Helpers.dataHelper import jsonConvert,calculateAlcoholSaturation, process_drinks_json,strCleaner,create_user_summary
 
 app = FastAPI()
 
@@ -52,7 +53,7 @@ def serve_user(id: str, userDrink: UserDrink):
     db = AppMongoClient()
     u = db.getUserById(id=id)
     if u is not None:
-        returnedId = db.insertUserDrink(uDrink=userDrink)
+        returnedId = db.insertUserDrink(uDrink=processDrinkOrder(userDrink))
         return {"id": str(returnedId)}
     else:
         raise HTTPException(status_code=400, detail="User not found in system")
@@ -60,11 +61,17 @@ def serve_user(id: str, userDrink: UserDrink):
 
 @app.get("/getCurrentPatrons", status_code=status.HTTP_200_OK)
 def get_Current_Patrons():
-    return jsonConvert(AppMongoClient().getCurrentPatrons())
+    return create_user_summary(jsonConvert(AppMongoClient().getCurrentPatrons()))
 
 @app.get('/strCleaner')
 def strCleaner_test(s:str):
     return strCleaner(s)
+
+def processDrinkOrder(ud:UserDrink):
+        res = apiHelper().get_drinkById(ud.drinkId)
+        ud.drinkName = res['drinks'][0]['strDrink']
+        ud.AlcoholAmount = process_drinks_json(res)
+        return ud
 
 
 

@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+import os
 from pymongo import *
 from Models.models import User, UserDTO, UserDrink
 
@@ -10,7 +11,7 @@ class AppMongoClient:
 
     def get_database(self):
         # Provide the mongodb atlas url to connect python to mongodb using pymongo
-        CONNECTION_STRING = "mongodb://127.0.0.1:27017/"
+        CONNECTION_STRING = os.getenv('MONGO_URI', "mongodb://localhost:27017/")
 
         # Create a connection using MongoClient. You can import MongoClient or use pymongo.MongoClient
         client = MongoClient(CONNECTION_STRING)
@@ -44,6 +45,8 @@ class AppMongoClient:
         UserDrink = {
             "drinkId": uDrink.drinkId,
             "userId": uDrink.userId,
+            "drinkName":uDrink.drinkName,
+            "AlcoholAmount":uDrink.AlcoholAmount,
             "purchaseTime": datetime.now(),
         }
         return collection_name.insert_one(UserDrink).inserted_id

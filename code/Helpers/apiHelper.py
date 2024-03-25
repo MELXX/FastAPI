@@ -1,6 +1,8 @@
 
 import httpx
 
+from Models.models import UserDrink
+
 
 class apiHelper:
     def __init__(self) -> None:
@@ -30,5 +32,5 @@ class apiHelper:
         req = httpx.get("https://www.thecocktaildb.com/api/json/v1/1/lookup.php?i=%s"%(id))
         return req.json()
     
-print(apiHelper().get_drinkById('11007')['drinks'][0]['strDrink'])
+#print(apiHelper().get_drinkById('11007')['drinks'][0]['strDrink'])
 

@@ -2,6 +2,9 @@ import json, re
 from bson import json_util
 from bson.json_util import dumps, CANONICAL_JSON_OPTIONS
 from fractions import Fraction
+from collections import defaultdict
+from datetime import datetime, timedelta
+
 
 def calculateAlcoholSaturation(id: str):
     alcoholic_items_abv = {
@@ -51,7 +54,11 @@ def calculateAlcoholSaturation(id: str):
         "Blackberry brandy": 25,  # Estimated ABV for blackberry brandy: 25%
         "Peppermint schnapps": 50,  # Estimated ABV for peppermint schnapps: 50%
     }
-    return alcoholic_items_abv[id]
+    item = alcoholic_items_abv.get(id)
+    if item:
+        return item / 100
+    else:
+        return 0
 
 
 def jsonConvert(data):
@@ -71,77 +78,105 @@ def getMeasurement(strMeasurement: str) -> str:
         return "oz"
 
 
-def strCleaner(s: str,len:int = 2):
+def strCleaner(s: str, len: int = 2):
     s = s.lstrip()
     s = s.strip()
     s = s[:-len]
     return float(sum(Fraction(s) for s in s.split()))
 
+
+def convert_to_ml(amount, unit):
+    """
+    Converts volume measurements to milliliters.
+
+    Args:
+    - amount (float): The amount of the volume to convert.
+    - unit (str): The unit of the volume to convert. Should be one of: "oz", "cl", or "cup".
+
+    Returns:
+    - float: The converted volume in milliliters.
+    """
+
+    if unit == "oz":
+        return amount * 29.5735
+    elif unit == "cl":
+        return amount * 10
+    elif unit == "cup":
+        return amount * 236.588
+    else:
+        return "Invalid unit. Please use 'oz', 'cl', or 'cup'."
+
+
 def process_drinks_json(json_data):
     # Load JSON data
-    data = json.loads(json_data)
-    
+    totalAlcMl = 0
+    data = json_data
+
     # Extract drinks list
-    drinks = data.get('drinks', [])
-    
-    # Initialize an empty dictionary to store ingredient-measure pairs
-    ingredient_measure_dict = {}
-    
+    drinks = data.get("drinks", [])
+
     # Iterate through drinks
     for drink in drinks:
         # Iterate through ingredient-measure pairs
         for i in range(1, 16):
-            ingredient_key = drink.get(f'strIngredient{i}')
-            measure_value = drink.get(f'strMeasure{i}')
-            
+            ingredient_key = drink.get(f"strIngredient{i}")
+            measure_value = drink.get(f"strMeasure{i}")
+
             # If ingredient is not None and measure is not None, add to dictionary
-            if ingredient_key and measure_value:
-                ingredient_measure_dict[ingredient_key] = strCleaner(measure_value,len(getMeasurement(measure_value)))
-    
-    return ingredient_measure_dict
+            alc = calculateAlcoholSaturation(ingredient_key)
+            if ingredient_key and measure_value and alc:
+                # ingredient_measure_dict[ingredient_key] = convert_to_ml(strCleaner(measure_value,len(getMeasurement(measure_value))),getMeasurement(measure_value))*alc
+                totalAlcMl += (
+                    convert_to_ml(
+                        strCleaner(measure_value, len(getMeasurement(measure_value))),
+                        getMeasurement(measure_value),
+                    )
+                    * alc
+                )
 
-# Example JSON data
-json_data = '''
-{
-    "drinks": [
-        {
-            "strIngredient1": "Tequila",
-            "strIngredient2": "Triple sec",
-            "strIngredient3": "Lime juice",
-            "strIngredient4": "Salt",
-            "strIngredient5": null,
-            "strIngredient6": null,
-            "strIngredient7": null,
-            "strIngredient8": null,
-            "strIngredient9": null,
-            "strIngredient10": null,
-            "strIngredient11": null,
-            "strIngredient12": null,
-            "strIngredient13": null,
-            "strIngredient14": null,
-            "strIngredient15": null,
-            "strMeasure1": "1 1/2 oz ",
-            "strMeasure2": "1/2 oz ",
-            "strMeasure3": "1 cup ",
-            "strMeasure4": null,
-            "strMeasure5": null,
-            "strMeasure6": null,
-            "strMeasure7": null,
-            "strMeasure8": null,
-            "strMeasure9": null,
-            "strMeasure10": null,
-            "strMeasure11": null,
-            "strMeasure12": null,
-            "strMeasure13": null,
-            "strMeasure14": null,
-            "strMeasure15": null
-        }
-    ]
-}
-'''
+    return totalAlcMl
 
-# Process JSON data
-result = process_drinks_json(json_data)
 
-# Print the result
-print(result)
+
+def create_user_summary(drink_entries):
+    """
+    Creates a summary for each user containing their last drink, last drink time,
+    and alcohol saturation, considering only entries from the last 8 hours.
+
+    Args:
+    - drink_entries (list): A list of dictionaries representing drink entries.
+
+    Returns:
+    - list: A list of dictionaries containing the user summary objects.
+    """
+
+    user_summary = defaultdict(lambda: {"userId": "", "lastDrink": "", "lastDrinkTime": "", "alcoholSaturation": 0})
+
+    # Calculate the timestamp 8 hours ago
+    eight_hours_ago = datetime.utcnow() - timedelta(hours=8)
+
+    # Iterate through drink entries to calculate alcohol saturation for each user
+    for entry in drink_entries:
+        purchase_time = datetime.strptime(entry["purchaseTime"]["$date"], "%Y-%m-%dT%H:%M:%S.%fZ")
+
+        # Skip entries older than 8 hours
+        if purchase_time < eight_hours_ago:
+            continue
+
+        user_id = entry["userId"]
+        drink_name = entry["drinkName"]
+        alcohol_amount = entry["AlcoholAmount"]
+
+        # Update user summary
+        user_summary[user_id]["userId"] = user_id
+        user_summary[user_id]["lastDrink"] = drink_name
+        user_summary[user_id]["lastDrinkTime"] = purchase_time.time()
+
+        # Calculate alcohol saturation
+        user_summary[user_id]["alcoholSaturation"] += alcohol_amount
+
+    # Convert datetime to ISO 8601 format
+    for user_id, summary in user_summary.items():
+        summary["lastDrinkTime"] = summary["lastDrinkTime"].isoformat()
+
+    return list(user_summary.values())
